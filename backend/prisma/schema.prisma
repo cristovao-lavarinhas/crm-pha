@@ -1,0 +1,198 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  name       String
+  password   String
+  role       UserRole @default(FARMACEUTICO)
+  farmaciaId String?
+  farmacia   Farmacia? @relation(fields: [farmaciaId], references: [id])
+  vendas     Venda[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Farmacia {
+  id                  String    @id @default(uuid())
+  nome                String
+  cnpj                String    @unique
+  endereco            String
+  telefone            String
+  email               String
+  responsavelTecnico  String
+  crf                 String
+  users               User[]
+  estoques            Estoque[]
+  clientes            Cliente[]
+  vendas              Venda[]
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("farmacias")
+}
+
+model Produto {
+  id                   String      @id @default(uuid())
+  nome                 String
+  descricao            String?
+  codigoEan            String      @unique
+  principioAtivo       String
+  concentracao         String
+  forma                String
+  apresentacao         String
+  laboratorio          String
+  categoria            String
+  preco                Decimal     @db.Decimal(10, 2)
+  prescricaoObrigatoria Boolean    @default(false)
+  controlado           Boolean     @default(false)
+  generico             Boolean     @default(false)
+  estoques             Estoque[]
+  itensVenda           ItemVenda[]
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  @@map("produtos")
+}
+
+model Estoque {
+  id               String      @id @default(uuid())
+  produtoId        String
+  farmaciaId       String
+  lote             String
+  quantidade       Int
+  quantidadeMinima Int
+  dataVencimento   DateTime
+  precoCompra      Decimal     @db.Decimal(10, 2)
+  precoVenda       Decimal     @db.Decimal(10, 2)
+  produto          Produto     @relation(fields: [produtoId], references: [id])
+  farmacia         Farmacia    @relation(fields: [farmaciaId], references: [id])
+  itensVenda       ItemVenda[]
+  movimentos       MovimentoEstoque[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@unique([produtoId, farmaciaId, lote])
+  @@map("estoques")
+}
+
+model MovimentoEstoque {
+  id        String            @id @default(uuid())
+  estoqueId String
+  tipo      TipoMovimento
+  quantidade Int
+  motivo    String
+  usuarioId String?
+  estoque   Estoque           @relation(fields: [estoqueId], references: [id])
+  createdAt DateTime          @default(now())
+
+  @@map("movimentos_estoque")
+}
+
+model Cliente {
+  id             String    @id @default(uuid())
+  nome           String
+  cpf            String?   @unique
+  telefone       String?
+  email          String?
+  endereco       String?
+  dataNascimento DateTime?
+  farmaciaId     String
+  farmacia       Farmacia  @relation(fields: [farmaciaId], references: [id])
+  vendas         Venda[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("clientes")
+}
+
+model Venda {
+  id             String         @id @default(uuid())
+  farmaciaId     String
+  clienteId      String?
+  vendedorId     String
+  total          Decimal        @db.Decimal(10, 2)
+  desconto       Decimal        @db.Decimal(10, 2) @default(0)
+  formaPagamento FormaPagamento
+  status         StatusVenda    @default(PENDENTE)
+  observacoes    String?
+  farmacia       Farmacia       @relation(fields: [farmaciaId], references: [id])
+  cliente        Cliente?       @relation(fields: [clienteId], references: [id])
+  vendedor       User           @relation(fields: [vendedorId], references: [id])
+  itens          ItemVenda[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("vendas")
+}
+
+model ItemVenda {
+  id            String  @id @default(uuid())
+  vendaId       String
+  produtoId     String
+  estoqueId     String
+  quantidade    Int
+  precoUnitario Decimal @db.Decimal(10, 2)
+  desconto      Decimal @db.Decimal(10, 2) @default(0)
+  venda         Venda   @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  produto       Produto @relation(fields: [produtoId], references: [id])
+  estoque       Estoque @relation(fields: [estoqueId], references: [id])
+
+  @@map("itens_venda")
+}
+
+model Fornecedor {
+  id       String @id @default(uuid())
+  nome     String
+  cnpj     String @unique
+  endereco String
+  telefone String
+  email    String
+  contato  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("fornecedores")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  FARMACEUTICO
+  VENDEDOR
+  GERENTE
+}
+
+enum FormaPagamento {
+  DINHEIRO
+  CARTAO_DEBITO
+  CARTAO_CREDITO
+  PIX
+  CONVENIO
+}
+
+enum StatusVenda {
+  PENDENTE
+  FINALIZADA
+  CANCELADA
+}
+
+enum TipoMovimento {
+  ENTRADA
+  SAIDA
+  AJUSTE
+  VENCIMENTO
+  PERDA
+}
